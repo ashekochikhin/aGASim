@@ -1,5 +1,0 @@
-version: "Apple Swift version 5.1.3 (swiftlang-1100.0.282.1 clang-1100.0.33.15)"
-options: "46f37c15ebbd8502b653f424d32c2559"
-build_time: [1578247011, 129813000]
-inputs:
-  "/Users/aleksejsekocihin/Documents/GitHub/aGASim/Sources/GA/main.swift": [1578245882, 38870215]
