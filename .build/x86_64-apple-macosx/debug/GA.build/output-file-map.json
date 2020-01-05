@@ -1,0 +1,11 @@
+{
+  "": {
+    "swift-dependencies": "/Users/aleksejsekocihin/Documents/GitHub/aGASim/.build/x86_64-apple-macosx/debug/GA.build/master.swiftdeps"
+  },
+  "/Users/aleksejsekocihin/Documents/GitHub/aGASim/Sources/GA/main.swift": {
+    "dependencies": "/Users/aleksejsekocihin/Documents/GitHub/aGASim/.build/x86_64-apple-macosx/debug/GA.build/main.d",
+    "object": "/Users/aleksejsekocihin/Documents/GitHub/aGASim/.build/x86_64-apple-macosx/debug/GA.build/main.swift.o",
+    "swiftmodule": "/Users/aleksejsekocihin/Documents/GitHub/aGASim/.build/x86_64-apple-macosx/debug/GA.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/aleksejsekocihin/Documents/GitHub/aGASim/.build/x86_64-apple-macosx/debug/GA.build/main.swiftdeps"
+  }
+}
