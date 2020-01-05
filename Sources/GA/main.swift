@@ -1,10 +1,11 @@
 import Foundation
+import Dispatch
 
 class System {
-    private var observableAgentID: UUID!
     private var currAgenStates = [UUID: (state: State, target: State, postDate: Date)]()
     private var agents = [Agent]()
-    
+    private var serial = DispatchQueue.init(label: "serialGA")
+    private var concurent = DispatchQueue.init(label: "concurentGA", qos: .default, attributes: .concurrent, autoreleaseFrequency: .never, target: nil)
     
     static let shared = System()
     private init(){}
@@ -15,32 +16,18 @@ class System {
             register(agent)
             agent.postState()
         }
-        observableAgentID = agents.first?.id
     }
-    
-    func getObservableAgentLatentVector() -> [Float] {
-        let agent = agents.first{ (agent) -> Bool in
-            return agent.id == observableAgentID
-        }
-        return agent!.currState.getCurrentLatentVector()
-    }
-    
     
     func postStateFrom(_ agent:Agent) {
-        currAgenStates[agent.id] = (agent.currState, agent.targetState, Date())
+        serial.sync {
+            self.currAgenStates[agent.id] = (agent.currState, agent.targetState, Date())
+        }
     }
  
     fileprivate func register(_ agent: Agent) {
-        agents.append(agent)
+        self.agents.append(agent)
     }
-    
-    fileprivate func unregister(_ agent: Agent) {
-        currAgenStates.removeValue(forKey: agent.id)
-        agents.removeAll { (ag) -> Bool in
-            ag.id == agent.id
-        }
-    }
-    
+        
     static func distance(st1: State, st2: State) -> Int {
         var result:Int = 0
         for i in 0 ... GenerativeModel.chromosomeLength - 1 {
@@ -50,42 +37,57 @@ class System {
         }
         return result
     }
-    
-    func getTargetStates() -> [State] {
-        return currAgenStates.map({ (value) -> State in
-            return value.value.target
-        })
-    }
-    
-    func getCurrStates() -> [State] {
-        return currAgenStates.map({ (value) -> State in
-            return value.value.state
-        })
-    }
         
     func getCurrStates(ecsept: UUID) -> [State] {
         var result = [State]()
-        for pair in currAgenStates {
-            if pair.key != ecsept {
-                result.append(pair.value.state)
+        serial.sync {
+            for pair in self.currAgenStates {
+                if pair.key != ecsept {
+                    result.append(pair.value.state)
+                }
             }
         }
-        
+
         return result
     }
     func update()  {
         agents.shuffle()
+        
+        let group = DispatchGroup.init()
         for agent in agents {
-            agent.mutate()
+            group.enter()
+            concurent.async {
+                agent.mutate()
+                group.leave()
+            }
         }
+        group.wait()
     }
     
-    func getAverageDistanceToTargets() -> Int {
-        var sum = 0
+    func getMedianDistanceToTargets() -> Float {
+        var distances = [Int]()
+        let group = DispatchGroup.init()
         for agent in agents {
-            sum += System.distance(st1: agent.targetState, st2: agent.currState)
+            group.enter()
+            concurent.async {
+                let currdistance = System.distance(st1: agent.targetState, st2: agent.currState)
+                self.serial.sync {
+                    distances.append(currdistance)
+                }
+                group.leave()
+            }
         }
-        return Int(sum / GenerativeModel.numberOfAgents)
+        group.wait()
+        return calculateMedian(array: distances)
+    }
+    
+    private func calculateMedian(array: [Int]) -> Float {
+        let sorted = array.sorted()
+        if sorted.count % 2 == 0 {
+            return Float((sorted[(sorted.count / 2)] + sorted[(sorted.count / 2) - 1])) / 2
+        } else {
+            return Float(sorted[(sorted.count - 1) / 2])
+        }
     }
     
 }
@@ -176,22 +178,31 @@ class Agent {
 struct GenerativeModel {
     static let chromosomeLength = 128
     static let alphabetLength = 2
-    static let numberOfAgents = 16
+    static let numberOfAgents = 32
     
     static let crossoverSelfWeight: Float = 0.5
     static let mutationsNumber = 10
 }
 
 let system = System.shared
-print("Number of agents: \(GenerativeModel.numberOfAgents)")
-
-
 system.initSetup()
-var averageOverPopulationDistanceToTheTarget = [Int]()
-for i in 0 ... 64 {
+var amedianOverPopulationDistanceToTheTarget = [Float]()
+for i in 0 ... 32 {
     print("iteration: \(i)")
-    averageOverPopulationDistanceToTheTarget.append(system.getAverageDistanceToTargets())
+    amedianOverPopulationDistanceToTheTarget.append(system.getMedianDistanceToTargets())
     system.update()
 }
 
-print(averageOverPopulationDistanceToTheTarget)
+print(amedianOverPopulationDistanceToTheTarget)
+func getDocumentsDirectory() -> URL {
+    let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+    return paths[0]
+}
+let str = "\(amedianOverPopulationDistanceToTheTarget)"
+let filename = getDocumentsDirectory().appendingPathComponent("output_\(GenerativeModel.numberOfAgents).txt")
+
+do {
+    try str.write(to: filename, atomically: true, encoding: String.Encoding.utf8)
+} catch {
+    // failed to write file – bad permissions, bad filename, missing permissions, or more likely it can't be converted to the encoding
+}
